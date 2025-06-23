@@ -7,10 +7,10 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 struct SimulationArgs<'a> {
     sims: usize,
     steps: usize,
-    signal_distribution: Normal<f64>,
-    signal_threshold: f64,
-    normal_volatility: Normal<f64>,
-    high_volatility: Normal<f64>,
+    signal_distribution_percent: Normal<f64>,
+    signal_threshold_percent: f64,
+    normal_volatility_percent: Normal<f64>,
+    high_volatility_percent: Normal<f64>,
     buckets: &'a Vec<(f64, f64)>,
 }
 
@@ -21,15 +21,15 @@ fn main() {
         .map(|i| (step * (i as f64), step * (i as f64) + step))
         .collect::<Vec<(f64, f64)>>();
 
-    let signal_distribution = Normal::new(0.0, 0.01).unwrap();
+    let signal_distribution_percent = Normal::new(0.0, 0.5).unwrap();
 
     let args = SimulationArgs {
         sims: 1000000,
         steps: 300,
-        signal_distribution,
-        signal_threshold: 0.005,
-        normal_volatility: Normal::new(0.0, 0.01).unwrap(),
-        high_volatility: Normal::new(0.0, 0.05).unwrap(),
+        signal_distribution_percent,
+        signal_threshold_percent: 0.05,
+        normal_volatility_percent: Normal::new(0.0, 0.5).unwrap(),
+        high_volatility_percent: Normal::new(0.0, 3.0).unwrap(),
         buckets: &buckets,
     };
 
@@ -59,20 +59,20 @@ fn simulate(args: &SimulationArgs, play_on_high_volatility: bool) -> Vec<f32> {
             |mut rng, _| {
                 let mut cash = 1.0;
                 for i in 0..args.steps {
-                    let signal_level = args.signal_distribution.sample(&mut rng);
+                    let signal_level = args.signal_distribution_percent.sample(&mut rng);
                     let high_volatility_day = i % 30 == 20;
                     let signal_error = if high_volatility_day {
                         if play_on_high_volatility {
-                            args.high_volatility.sample(&mut rng)
+                            args.high_volatility_percent.sample(&mut rng)
                         } else {
                             continue;
                         }
                     } else {
-                        args.normal_volatility.sample(&mut rng)
+                        args.normal_volatility_percent.sample(&mut rng)
                     };
-                    if signal_level > args.signal_threshold {
-                        let day_return = 1.0 + signal_level + signal_error;
-                        cash *= day_return;
+                    if signal_level > args.signal_threshold_percent {
+                        let day_return_percent = 100.0 + signal_level + signal_error;
+                        cash *= day_return_percent / 100.0;
                     }
                 }
                 cash
@@ -88,6 +88,5 @@ fn simulate(args: &SimulationArgs, play_on_high_volatility: bool) -> Vec<f32> {
             }
         }
     }
-    dbg!(&distribution);
     distribution.iter().map(|x| *x as f32).collect()
 }
