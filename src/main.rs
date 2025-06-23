@@ -12,7 +12,6 @@ struct SimulationArgs<'a> {
     normal_volatility: Normal<f64>,
     high_volatility: Normal<f64>,
     buckets: &'a Vec<(f64, f64)>,
-    play_on_high_volatility: bool,
 }
 
 fn main() {
@@ -24,26 +23,18 @@ fn main() {
 
     let signal_distribution = Normal::new(0.0, 0.01).unwrap();
 
-    let outcomes_risk = simulate(SimulationArgs {
+    let args = SimulationArgs {
         sims: 1000000,
         steps: 300,
         signal_distribution,
         signal_threshold: 0.005,
         normal_volatility: Normal::new(0.0, 0.01).unwrap(),
         high_volatility: Normal::new(0.0, 0.05).unwrap(),
-        play_on_high_volatility: true,
         buckets: &buckets,
-    });
-    let outcomes_safe = simulate(SimulationArgs {
-        sims: 1000000,
-        steps: 300,
-        signal_distribution,
-        signal_threshold: 0.005,
-        normal_volatility: Normal::new(0.0, 0.01).unwrap(),
-        high_volatility: Normal::new(0.0, 0.05).unwrap(),
-        play_on_high_volatility: false,
-        buckets: &buckets,
-    });
+    };
+
+    let outcomes_risk = simulate(&args, true);
+    let outcomes_safe = simulate(&args, false);
 
     let chart = LineChart::new(
         vec![
@@ -58,7 +49,7 @@ fn main() {
     fs::write("outcomes.png", svg_to_png(&chart.svg().unwrap()).unwrap()).unwrap();
 }
 
-fn simulate(args: SimulationArgs) -> Vec<f32> {
+fn simulate(args: &SimulationArgs, play_on_high_volatility: bool) -> Vec<f32> {
     let mut distribution = vec![0usize; args.buckets.len()];
 
     let outcomes = (0..args.sims)
@@ -71,7 +62,7 @@ fn simulate(args: SimulationArgs) -> Vec<f32> {
                     let signal_level = args.signal_distribution.sample(&mut rng);
                     let high_volatility_day = i % 30 == 20;
                     let signal_error = if high_volatility_day {
-                        if args.play_on_high_volatility {
+                        if play_on_high_volatility {
                             args.high_volatility.sample(&mut rng)
                         } else {
                             continue;
